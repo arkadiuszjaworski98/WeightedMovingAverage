@@ -16,16 +16,20 @@ using Microsoft.VisualBasic;
 
 internal class Program
 {
+    public static Broker broker = new();
+    public static string ticker = "IBM";
     private static void Main(string[] args)
     {
-        Broker broker = new();
-        string ticker = "IBM";
 
-        Thread thread = new(Update(broker, ticker));
-        thread.Start();
+        Thread updateThread = new(WMAUpdate);
+        Thread balanceThread = new (BalanceUpdate);
+
+        updateThread.Start();
+        balanceThread.Start();
+
     }
 
-    public static void Run(Broker broker, string ticker, WMAResponse response)
+    public static void Run(WMAResponse response)
     {
 
         bool isDeal = Deal.Get(response);
@@ -63,16 +67,36 @@ internal class Program
 
     }
 
-    private static ParameterizedThreadStart Update(Broker broker, string ticker)
+    private static void WMAUpdate()
     {
         Console.WriteLine($"{DateAndTime.Now} - Staring WMA Trading algoirthm to monitor {ticker} stock...\n");
         while (true)
         {
             Console.WriteLine($"{DateAndTime.Now} - Getting Weighted Moving Average for {ticker}\n");
             WMAResponse? response = Query.WMA(ticker, "daily", "10", "open");
-            Run(broker, ticker, response);
+            Run(response);
             Thread.Sleep(20000);
         }
+    }
+
+    private static void BalanceUpdate()
+    {
+        while (true)
+        {
+            Thread.Sleep(5000);
+
+            double porfolioValue = Bank.GetBalance();
+            broker.StockPortfolioDB.ForEach((stockOwned) =>
+            {
+                // find value of stockOwned.Ticker
+                // value * stockOwned.Amount
+                porfolioValue += stockOwned.Amount;
+            });
+
+            Console.WriteLine($"{DateAndTime.Now} - Bank balance is: {Bank.GetBalance()}");
+            Console.WriteLine($"{DateAndTime.Now} - Portfolio value is: {porfolioValue}\n");
+        }
+
     }
 
 }
